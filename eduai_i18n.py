@@ -33,6 +33,12 @@ COMPARISON_HOW_IT_WORKS = (
 )
 
 RU = {
+    "Try example": "Попробовать пример",
+    "Try comparison example": "Попробовать сравнение",
+    "Use my CSV": "Перейти к своему CSV",
+    "Load artificial student records and ready audit settings. Then click Run audit.": "Загрузить вымышленные записи студентов и готовые настройки аудита. Затем нажмите «Запустить аудит».",
+    "Load artificial records with two ready prediction columns and matching settings. Then click Run audit.": "Загрузить вымышленные записи с двумя готовыми прогнозами и настройками сравнения. Затем нажмите «Запустить аудит».",
+    "You are using artificial example data. Settings are ready; click Run audit. Upload a CSV or use the button below to return to your file.": "Сейчас используются вымышленные данные примера. Настройки готовы — нажмите «Запустить аудит». Чтобы перейти к своему файлу, загрузите CSV или нажмите кнопку ниже.",
     "Custom CSV": "Свой CSV", "Synthetic example": "Синтетический пример",
     "Audit existing probability predictions against observed outcomes. Compare review capacities, inspect group results, and download a report.": "Сравните готовые прогнозы вероятности с известными исходами: настройте доли отбора, изучите результаты по группам и скачайте отчёт.",
     "This app does not train a model or recommend a review capacity.": "Приложение проверяет готовые прогнозы. Выбор доли отбора остаётся за вами.",

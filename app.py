@@ -1,6 +1,8 @@
 """Bilingual local interface for audits of existing probability predictions."""
 
 import hashlib
+from copy import deepcopy
+from io import BytesIO
 from pathlib import Path
 
 import streamlit as st
@@ -18,6 +20,65 @@ from eduai_settings import HORIZONS, TIMINGS, read_settings, widget_settings, wr
 
 def result_signature(parts):
     return hashlib.sha256(repr(parts).encode("utf-8")).hexdigest()
+
+
+def source_digest(contents, *, example=False):
+    """Keep example widget settings separate from an upload of the same bytes."""
+    return hashlib.sha256((b"EduAI example\0" if example else b"") + contents).hexdigest()
+
+
+def example_file(comparison=False):
+    name = "sample_two_predictions.csv" if comparison else "sample_predictions.csv"
+    source = BytesIO((Path(__file__).parent / "examples" / name).read_bytes())
+    source.name = name
+    return source
+
+
+def start_example(comparison=False):
+    """Apply a complete example before its configuration widgets are rendered."""
+    if "example_mode" not in st.session_state:
+        upload_prefix = st.session_state.get("upload_config_prefix")
+        st.session_state["example_return_settings"] = {
+            name: deepcopy(st.session_state[name])
+            for name in ("delimiter", "encoding", "preset_id", "imported_settings") if name in st.session_state
+        }
+        st.session_state["example_return_widgets"] = {
+            name: deepcopy(value) for name, value in st.session_state.items()
+            if upload_prefix and name.startswith(upload_prefix)
+        }
+    contents = example_file(comparison).getvalue()
+    config = preset_defaults("example", load_prediction_csv(contents))
+    config.update(dataset_name="Synthetic example", review_shares=[.15, .2, .3], focus_share=.2,
+                  prediction_timing="", outcome_horizon="")
+    settings = read_settings(write_settings(config, preset_id="example", delimiter=",", encoding="utf-8-sig",
+                                           comparison_score_column="dropout_probability_b" if comparison else None))
+    digest = source_digest(contents, example=True)
+    st.session_state.update(widget_settings(settings, digest))
+    st.session_state["example_mode"] = "comparison" if comparison else "single"
+    st.session_state["imported_settings"] = {"digest": digest, "audit": settings["audit"]}
+    st.session_state.pop("audit_result_v2", None)
+
+
+def use_uploaded_csv():
+    """A new upload or the return button leaves the example immediately."""
+    if st.session_state.pop("example_mode", None) is not None:
+        previous = st.session_state.pop("example_return_settings", {})
+        defaults = {"delimiter": ",", "encoding": "utf-8-sig", "preset_id": "custom"}
+        for name, default in defaults.items():
+            st.session_state[name] = previous.get(name, default)
+        if "imported_settings" in previous:
+            st.session_state["imported_settings"] = previous["imported_settings"]
+        else:
+            st.session_state.pop("imported_settings", None)
+        st.session_state.update(st.session_state.pop("example_return_widgets", {}))
+        st.session_state.pop("audit_result_v2", None)
+
+
+def preserve_settings_for_language():
+    """Send canonical selections again when their displayed option labels change."""
+    for name, value in list(st.session_state.items()):
+        if name in ("delimiter", "encoding", "preset_id") or ":" in name:
+            st.session_state[name] = deepcopy(value)
 
 
 def select(label, options, key, default=None, **kwargs):
@@ -46,7 +107,8 @@ def main():
     title_area, language_area = st.columns([4, 1])
     with language_area:
         language = st.selectbox("Language / Язык", ["en", "ru"],
-                                format_func=lambda value: {"en": "English", "ru": "Русский"}[value], key="language", filter_mode=None)
+                                format_func=lambda value: {"en": "English", "ru": "Русский"}[value], key="language", filter_mode=None,
+                                on_change=preserve_settings_for_language)
     t = lambda text, **values: tr(text, language, **values)
     with title_area:
         st.title("EduAI Audit")
@@ -57,7 +119,17 @@ def main():
     left, right = st.columns([2, 1])
     with left:
         uploaded = st.file_uploader(t("CSV file"), type="csv", key="upload_file",
-                                   help=t(CSV_REQUIREMENTS))
+                                   help=t(CSV_REQUIREMENTS), on_change=use_uploaded_csv)
+        example_left, example_right = st.columns(2)
+        example_left.button(t("Try example"), key="try_example", on_click=start_example,
+                            help=t("Load artificial student records and ready audit settings. Then click Run audit."))
+        example_right.button(t("Try comparison example"), key="try_comparison_example", on_click=start_example, args=(True,),
+                             help=t("Load artificial records with two ready prediction columns and matching settings. Then click Run audit."))
+        is_example = "example_mode" in st.session_state
+        if is_example:
+            uploaded = example_file(st.session_state["example_mode"] == "comparison")
+            st.info(t("You are using artificial example data. Settings are ready; click Run audit. Upload a CSV or use the button below to return to your file."))
+            st.button(t("Use my CSV"), key="use_my_csv", on_click=use_uploaded_csv)
         with st.expander(t("Load saved settings (optional)")):
             settings_file = st.file_uploader(t("Settings JSON file"), type="json", key="settings_file")
             if st.button(t("Apply settings"), key="apply_settings", disabled=uploaded is None or settings_file is None):
@@ -71,7 +143,7 @@ def main():
                 except ValueError as exc:
                     st.error(error_text(exc, language))
                 else:
-                    digest = hashlib.sha256(uploaded.getvalue()).hexdigest()
+                    digest = source_digest(uploaded.getvalue(), example=is_example)
                     st.session_state.update(widget_settings(settings, digest))
                     st.session_state["imported_settings"] = {"digest": digest, "audit": settings["audit"]}
                     st.success(t("Settings applied. Review the data summary before running the audit."))
@@ -90,7 +162,7 @@ def main():
         return
 
     file_bytes = uploaded.getvalue()
-    file_digest = hashlib.sha256(file_bytes).hexdigest()
+    file_digest = source_digest(file_bytes, example=is_example)
     imported = st.session_state.get("imported_settings", {})
     imported_config = imported.get("audit", {}) if imported.get("digest") == file_digest else {}
     try:
@@ -116,6 +188,8 @@ def main():
         }[preset_id]))
     defaults = preset_defaults(preset_id, frame)
     prefix = file_digest[:16] + ":" + preset_id
+    if not is_example:
+        st.session_state["upload_config_prefix"] = prefix + ":"
     key = lambda name: prefix + ":" + name
     columns = frame.columns.tolist()
     preset = PRESETS[preset_id]

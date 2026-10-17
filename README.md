@@ -32,8 +32,14 @@ A desktop shortcut can point to `.venv\Scripts\pythonw.exe` with the full path t
 This shortcut uses the current local installation; it is not a standalone executable.
 To start with terminal output, use the Streamlit command above.
 
-For a first try, upload [examples/sample_predictions.csv](examples/sample_predictions.csv).
-Select the **Synthetic example** preset. It fills `outcome` as the outcome column,
+For a first try, click **Try example**, then **Run audit**. The app loads artificial
+data and complete settings without a file upload, with review shares 15%, 20%,
+and 30% and a 20% report focus. **Try comparison example** loads two predictions.
+**Use my CSV**, or uploading a new file, returns to your own data and clears the
+example results. Example settings are separate from uploaded-file settings.
+
+You can also upload [examples/sample_predictions.csv](examples/sample_predictions.csv)
+and select the **Synthetic example** preset. It fills `outcome` as the outcome column,
 `dropout_probability` as the score, `Dropout` as positive, `Graduate` as negative,
 `Enrolled` as excluded, `student_id` as decision key and student ID, and `study_mode`
 as a group. Review or edit any field before running the audit.
@@ -135,8 +141,12 @@ or significance test and no automatic model recommendation. The HTML report
 includes aggregate comparisons and both full individual audit reports. Settings
 JSON version 2 stores the second column; version 1 single-model profiles still load.
 
-For a synthetic demonstration, download **two-model sample CSV**, upload it, select
-**Synthetic example**, enable comparison, and choose `dropout_probability_b` for B.
+For a synthetic demonstration, click **Try comparison example**, then **Run audit**.
+At the 20% focus, each model selects 4 of 16 audited records: A finds 2 positive
+cases with 2 false alarms; B finds 4 positive cases with no false alarms. Two
+records are selected by both, two only by A, and two only by B. Alternatively,
+download **two-model sample CSV**, upload it, select **Synthetic example**, enable
+comparison, and choose `dropout_probability_b` for B.
 These are illustrative probabilities, not a newly trained model or research result.
 
 ## Notebooks
