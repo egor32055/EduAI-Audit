@@ -9,7 +9,7 @@ from eduai_app_service import build_uploaded_audit, load_prediction_csv, preview
 from eduai_charts import capacity_chart, group_chart
 from eduai_comparison_view import render_model_comparison
 from eduai_exports import EXPORT_LABELS, export_tables, table_csv, tables_zip
-from eduai_i18n import COMPARISON_HOW_IT_WORKS, COMPARISON_REQUIREMENTS, METRIC_HELP, error_text, metric_help, tr
+from eduai_i18n import COMPARISON_HOW_IT_WORKS, COMPARISON_REQUIREMENTS, CSV_REQUIREMENTS, METRIC_HELP, error_text, metric_help, tr
 from eduai_presets import PRESETS, preset_defaults
 from eduai_model_comparison import compare_uploaded_predictions, preview_model_comparison
 from eduai_report_locale import present_report
@@ -57,7 +57,7 @@ def main():
     left, right = st.columns([2, 1])
     with left:
         uploaded = st.file_uploader(t("CSV file"), type="csv", key="upload_file",
-                                   help=t("One row per decision; include existing probabilities and observed outcomes."))
+                                   help=t(CSV_REQUIREMENTS))
         with st.expander(t("Load saved settings (optional)")):
             settings_file = st.file_uploader(t("Settings JSON file"), type="json", key="settings_file")
             if st.button(t("Apply settings"), key="apply_settings", disabled=uploaded is None or settings_file is None):

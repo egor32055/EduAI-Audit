@@ -1,5 +1,17 @@
 """Human-written UI translations. Dataset names and source codes stay intact."""
 
+CSV_REQUIREMENTS = (
+    "**Table requirements**\n\n"
+    "- A CSV with a header and at least one data row. Column names must be non-empty and unique; choose the file's delimiter and encoding here.\n"
+    "- One row per decision: for example, one student or one student-course enrollment.\n"
+    "- Required: a known observed outcome and a ready probability of the positive outcome. Probabilities must be finite numbers from 0 to 1, with no missing values, including on rows you later exclude.\n"
+    "- Outcome values must have no blanks or missing values. At the next step, assign every value to positive, negative or excluded.\n"
+    "- Use one or more columns as a unique decision key, with no missing or blank key values. If no key is available, the next step offers a technical source-row key; it cannot detect duplicate students.\n"
+    "- Optional: a student ID and group columns for group comparisons. A student may have several course records, but each decision key must be unique.\n"
+    "- To compare two predictions, include a second ready probability column for the same outcome, prediction time and outcome period.\n\n"
+    "Column names are your choice: select them after uploading. A raw dataset without ready predictions must be prepared outside this app. The app does not train a model."
+)
+
 COMPARISON_REQUIREMENTS = (
     "**Comparison conditions**\n\n"
     "- One CSV contains the same decision records and both ready probability columns. Each decision key must be unique.\n"
@@ -174,6 +186,17 @@ RU.update({
 
 
 RU.update({
+    CSV_REQUIREMENTS: (
+        "**Требования к таблице**\n\n"
+        "- CSV с названиями столбцов и хотя бы одной строкой данных. Названия должны быть непустыми и уникальными; здесь же выберите разделитель и кодировку файла.\n"
+        "- Одна строка — одно решение: например, один студент или одна запись студента на курс.\n"
+        "- Обязательно: известный фактический исход и готовая вероятность положительного исхода. Вероятности — конечные числа от 0 до 1 без пропусков, в том числе в строках, которые вы затем исключите.\n"
+        "- В исходах не должно быть пустых значений и пропусков. На следующем этапе распределите все значения на положительные, отрицательные или исключаемые.\n"
+        "- Выберите один или несколько столбцов, которые вместе образуют уникальный ключ решения, без пропусков и пустых значений. Если ключа нет, на следующем этапе можно использовать технический номер строки; он не выявляет повторяющихся студентов.\n"
+        "- Необязательно: ID студента и столбцы групп для сравнения. У студента может быть несколько записей на курсы, но ключ каждого решения должен быть уникальным.\n"
+        "- Для сравнения двух прогнозов добавьте вторую колонку готовых вероятностей того же исхода, на тот же момент и за тот же период.\n\n"
+        "Названия столбцов могут быть любыми: вы выберете их после загрузки. Исходную таблицу без готовых прогнозов нужно подготовить вне приложения. Приложение не обучает модель."
+    ),
     "How comparison works": "Как работает сравнение",
     COMPARISON_REQUIREMENTS: (
         "**Условия сравнения**\n\n"
