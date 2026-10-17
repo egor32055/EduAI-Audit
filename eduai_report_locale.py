@@ -6,7 +6,7 @@ import re
 
 import pandas as pd
 
-from eduai_charts import charts_html
+from eduai_charts import charts_html, group_charts_html
 from eduai_i18n import metric_help, tr
 from eduai_report import _report_interval, _report_number, _report_percent
 
@@ -185,7 +185,7 @@ def present_report(report, comparison, language="en"):
     """Change presentation language and add plots without rerunning the audit."""
     if language not in ("en", "ru"):
         raise ValueError("Unsupported language")
-    chart_html = charts_html(comparison["summary"], language)
+    chart_html = charts_html(comparison["summary"], language) + group_charts_html(comparison["reports"][report["focus_share"]], language)
     metric_note = next(note for note in report["limitations"] if note.startswith("Recall divides"))
     if language == "en":
         html = report["html"].replace("<html>", '<html lang="en">', 1)

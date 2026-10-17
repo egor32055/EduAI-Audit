@@ -73,7 +73,7 @@ class PresentationTests(unittest.TestCase):
         self.assertTrue(any("Recall" in finding["text"] for finding in russian["findings"]))
         self.assertNotIn("Key Findings", russian["html"])
         self.assertNotIn("Limited Outcome Support", russian["html"])
-        self.assertEqual(russian["html"].count("<svg "), 2)
+        self.assertEqual(russian["html"].count("<svg "), 4)
         self.assertNotIn("<script", russian["html"])
         pd.testing.assert_frame_equal(comparison["summary"], original["summary"])
         pd.testing.assert_frame_equal(report["tables"]["scope"], original_report["tables"]["scope"])
@@ -150,7 +150,7 @@ class AppFlowTests(unittest.TestCase):
             shares.set_value([10, 20]).run(timeout=30)
             self.assertEqual(len(app.metric), 0)
             self.assertEqual(next(widget for widget in app.selectbox if widget.label == "Доля отбора для подробного отчёта").options, ["10%", "20%"])
-            shares.set_value([]).run(timeout=30)
+            next(widget for widget in app.multiselect if widget.label == "Доли отбора (%)").set_value([]).run(timeout=30)
             self.assertEqual(len(app.exception), 0)
             self.assertTrue(app.button(key="run_audit").disabled)
 

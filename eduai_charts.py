@@ -3,6 +3,7 @@
 from html import escape
 
 import altair as alt
+import numpy as np
 import pandas as pd
 
 from eduai_i18n import tr
@@ -15,6 +16,78 @@ SERIES = {
               ("false_positive_rate_pct", "False-positive rate")],
 }
 COLORS = ["#2251A4", "#8C56A2", "#CC7A28", "#367B80"]
+
+
+def group_chart_data(audit, feature, language="en"):
+    """Keep original estimates and suppress unavailable intervals, never replace them by zero."""
+    data = audit["group_uncertainty"].loc[lambda frame: frame.group_column.eq(feature)].copy()
+    reference = audit["uncertainty_configuration"]["group_references"].get(feature)
+    data["point_kind"] = [tr("Group" if reference is None else "Reference group" if str(value) == str(reference) else "Other group", language)
+                          for value in data.group_value]
+    data["interval_status"] = data.ci_status.map(lambda value: tr(value, language))
+    data["support"] = data.support_note.map(lambda value: tr(value, language) if value else tr("No support flag", language))
+    available = data.ci_status.eq("Available") & np.isfinite(data.ci_lower_pct) & np.isfinite(data.ci_upper_pct)
+    data.loc[~available, ["ci_lower_pct", "ci_upper_pct"]] = np.nan
+    return data
+
+
+def group_chart(audit, feature, metric, language="en"):
+    data = group_chart_data(audit, feature, language).loc[lambda frame: frame.metric.eq(metric)]
+    label = "Recall" if metric == "recall_pct" else tr("False-positive rate", language)
+    groups = data.group_value.astype(str).tolist()
+    tooltip = [alt.Tooltip("group_value:N", title=tr("Group", language)),
+               alt.Tooltip("estimate_pct:Q", title=label + " (%)", format=".1f"),
+               alt.Tooltip("ci_lower_pct:Q", title=tr("Interval lower bound (%)", language), format=".1f"),
+               alt.Tooltip("ci_upper_pct:Q", title=tr("Interval upper bound (%)", language), format=".1f"),
+               alt.Tooltip("interval_status:N", title=tr("Interval status", language)),
+               alt.Tooltip("denominator_records:Q", title=tr("Relevant outcomes", language)),
+               alt.Tooltip("denominator_units:Q", title=tr("Contributing students", language)),
+               alt.Tooltip("support:N", title=tr("Support note", language))]
+    base = alt.Chart(data).encode(y=alt.Y("group_value:N", title=None, scale=alt.Scale(domain=groups)), tooltip=tooltip)
+    intervals = base.mark_rule(color="#8899AF", strokeWidth=2).encode(
+        x=alt.X("ci_lower_pct:Q", title=label + " (%)", scale=alt.Scale(domain=[0, 100])), x2="ci_upper_pct:Q")
+    points = base.mark_point(color=COLORS[0], filled=True, size=85).encode(
+        x=alt.X("estimate_pct:Q", title=label + " (%)", scale=alt.Scale(domain=[0, 100])),
+        shape=alt.Shape("point_kind:N", title=None, legend=alt.Legend(orient="bottom")
+                        if feature in audit["uncertainty_configuration"]["group_references"] else None))
+    confidence = 100 * audit["uncertainty_configuration"]["confidence_level"]
+    missing = base.transform_filter("!isValid(datum.estimate_pct)").mark_text(align="left", color="#68778C").encode(
+        x=alt.value(5), text=alt.value(tr("Metric unavailable", language)))
+    return (intervals + points + missing).properties(title=f"{label} · {confidence:g}% CI", height=max(280, 130 + 30 * len(groups)))
+
+
+def group_charts_html(audit, language="en"):
+    """Script-free interval plots for every group feature at the report focus share."""
+    parts = []
+    for feature in audit["configuration"]["group_columns"]:
+        data = group_chart_data(audit, feature, language)
+        for metric, name in [("recall_pct", "Recall"), ("false_positive_rate_pct", tr("False-positive rate", language))]:
+            rows = data.loc[data.metric.eq(metric)]
+            height = 110 + 30 * len(rows)
+            confidence = 100 * audit["uncertainty_configuration"]["confidence_level"]
+            title = f"{feature} · {name} · {confidence:g}% CI"
+            parts += [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 {height}" role="img" aria-label="{escape(title, quote=True)}">',
+                      f'<title>{escape(title)}</title><rect width="900" height="{height}" fill="white"/>',
+                      f'<text x="15" y="25" font-size="16">{escape(title)}</text>']
+            for tick in (0, 25, 50, 75, 100):
+                x = 240 + 6 * tick
+                parts += [f'<line x1="{x}" x2="{x}" y1="45" y2="{height - 35}" stroke="#dce2ec"/>',
+                          f'<text x="{x}" y="{height - 12}" text-anchor="middle" font-size="12">{tick}%</text>']
+            for index, (_, row) in enumerate(rows.iterrows()):
+                y = 60 + index * 30
+                estimate = f"{row.estimate_pct:g}%" if pd.notna(row.estimate_pct) else tr("Metric unavailable", language)
+                tip = f"{row.group_value}: {estimate}; {row.interval_status}; {row.support}; {row.point_kind}"
+                parts.append(f'<text x="225" y="{y + 4}" text-anchor="end" font-size="12">{escape(str(row.group_value))}<title>{escape(str(row.group_value))}</title></text>')
+                if pd.notna(row.ci_lower_pct) and pd.notna(row.ci_upper_pct):
+                    parts.append(f'<line x1="{240 + 6 * row.ci_lower_pct:.2f}" x2="{240 + 6 * row.ci_upper_pct:.2f}" y1="{y}" y2="{y}" stroke="#8899AF" stroke-width="2"><title>{escape(tip)}</title></line>')
+                if pd.notna(row.estimate_pct):
+                    parts.append(f'<circle cx="{240 + 6 * row.estimate_pct:.2f}" cy="{y}" r="5" fill="#2251A4"><title>{escape(tip)}</title></circle>')
+                else:
+                    parts.append(f'<text x="245" y="{y + 4}" font-size="12" fill="#68778C">{escape(tr("Metric unavailable", language))}<title>{escape(row.interval_status)}</title></text>')
+            parts.append('</svg>')
+    if not parts:
+        return ""
+    return '<section><h2>' + escape(tr("Group metrics at the focus share", language)) + '</h2>' + ''.join(parts) + '<p>' + escape(tr("Points show group estimates; lines show available confidence intervals. Unavailable intervals are not drawn. Inspect support notes in the tooltips and tables.", language)) + '</p></section>'
 
 
 def capacity_chart_data(summary, kind, language="en"):

@@ -8,9 +8,41 @@ import pandas as pd
 
 from eduai_report import build_audit_report
 from eduai_review_shares import audit_review_shares
+from eduai_validated_audit import validate_audit_input
 
 
 SOURCE_ROW_COLUMN = "__source_row_number__"
+
+
+def _prepare_frame(frame, target_column, decision_id_columns, use_source_row_number):
+    if use_source_row_number:
+        if SOURCE_ROW_COLUMN in frame.columns:
+            raise ValueError("The reserved source row column already exists.")
+        frame = frame.copy()
+        frame[SOURCE_ROW_COLUMN] = range(1, len(frame) + 1)
+        decision_id_columns = [SOURCE_ROW_COLUMN]
+    if target_column in frame.columns and frame[target_column].map(
+        lambda value: isinstance(value, str) and not value.strip()
+    ).any():
+        raise ValueError("The outcome column contains blank values.")
+    return frame, decision_id_columns
+
+
+def preview_uploaded_audit(frame, config):
+    """Run notebook input checks without ranking, intervals, or fitting a model."""
+    frame, keys = _prepare_frame(frame, config["target_column"], config["decision_id_columns"], config["use_source_row_number"])
+    prepared, validation = validate_audit_input(
+        frame, **{name: config[name] for name in ("target_column", "positive_value", "negative_values", "excluded_values",
+            "score_column", "decision_unit", "entity_id_column", "group_columns")},
+        decision_id_columns=keys, review_share=config["focus_share"],
+    )
+    for column, reference in config["group_references"].items():
+        if column not in config["group_columns"] or str(reference) not in prepared[column].astype("object").fillna("Unknown").astype(str).unique():
+            raise ValueError(f"Reference group not found in audited rows: {column}")
+    return {**validation,
+            "positive_records": int(prepared[config["target_column"]].eq(config["positive_value"]).sum()),
+            "negative_records": int(prepared[config["target_column"]].isin(config["negative_values"]).sum()),
+            "unique_students": int(prepared[config["entity_id_column"]].nunique()) if config["entity_id_column"] else None}
 
 
 def load_prediction_csv(contents, *, delimiter=",", encoding="utf-8-sig"):
@@ -76,16 +108,7 @@ def build_uploaded_audit(
     use_source_row_number=False,
 ):
     """Run the unchanged notebook audit functions and format their result."""
-    if use_source_row_number:
-        if SOURCE_ROW_COLUMN in frame.columns:
-            raise ValueError("The reserved source row column already exists.")
-        frame = frame.copy()
-        frame[SOURCE_ROW_COLUMN] = range(1, len(frame) + 1)
-        decision_id_columns = [SOURCE_ROW_COLUMN]
-    if target_column in frame.columns and frame[target_column].map(
-        lambda value: isinstance(value, str) and not value.strip()
-    ).any():
-        raise ValueError("The outcome column contains blank values.")
+    frame, decision_id_columns = _prepare_frame(frame, target_column, decision_id_columns, use_source_row_number)
     if focus_share not in review_shares:
         raise ValueError("The report focus share must be one of the compared shares.")
     comparison = audit_review_shares(

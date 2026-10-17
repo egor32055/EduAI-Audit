@@ -5,11 +5,13 @@ from pathlib import Path
 
 import streamlit as st
 
-from eduai_app_service import build_uploaded_audit, load_prediction_csv
-from eduai_charts import capacity_chart
+from eduai_app_service import build_uploaded_audit, load_prediction_csv, preview_uploaded_audit
+from eduai_charts import capacity_chart, group_chart
+from eduai_exports import EXPORT_LABELS, export_tables, table_csv, tables_zip
 from eduai_i18n import METRIC_HELP, error_text, metric_help, tr
 from eduai_presets import PRESETS, preset_defaults
 from eduai_report_locale import present_report
+from eduai_settings import HORIZONS, TIMINGS, read_settings, widget_settings, write_settings
 
 
 def result_signature(parts):
@@ -54,6 +56,20 @@ def main():
     with left:
         uploaded = st.file_uploader(t("CSV file"), type="csv", key="upload_file",
                                    help=t("One row per decision; include existing probabilities and observed outcomes."))
+        with st.expander(t("Load saved settings (optional)")):
+            settings_file = st.file_uploader(t("Settings JSON file"), type="json", key="settings_file")
+            if st.button(t("Apply settings"), key="apply_settings", disabled=uploaded is None or settings_file is None):
+                try:
+                    settings = read_settings(settings_file.getvalue())
+                    candidate = load_prediction_csv(uploaded.getvalue(), **settings["csv"])
+                    preview_uploaded_audit(candidate, settings["audit"])
+                except ValueError as exc:
+                    st.error(error_text(exc, language))
+                else:
+                    digest = hashlib.sha256(uploaded.getvalue()).hexdigest()
+                    st.session_state.update(widget_settings(settings, digest))
+                    st.session_state["imported_settings"] = {"digest": digest, "audit": settings["audit"]}
+                    st.success(t("Settings applied. Review the data summary before running the audit."))
     with right:
         delimiter = st.selectbox(t("Delimiter"), [",", ";", "\t", "|"], key="delimiter", filter_mode=None,
                                 format_func=lambda value: t({",": "Comma", ";": "Semicolon", "\t": "Tab", "|": "Pipe"}[value]))
@@ -68,6 +84,8 @@ def main():
 
     file_bytes = uploaded.getvalue()
     file_digest = hashlib.sha256(file_bytes).hexdigest()
+    imported = st.session_state.get("imported_settings", {})
+    imported_config = imported.get("audit", {}) if imported.get("digest") == file_digest else {}
     try:
         frame = load_prediction_csv(file_bytes, delimiter=delimiter, encoding=encoding)
     except ValueError as exc:
@@ -98,8 +116,11 @@ def main():
     missing = [column for column in expected if column not in columns]
     if missing:
         st.warning(t("The selected preset could not find these expected columns: {columns}. Select available mappings or upload a prepared prediction export.", columns=", ".join(missing)))
-    name_default = uploaded.name.rsplit(".", 1)[0] if preset_id == "custom" else preset["name"]
-    name_options = list(dict.fromkeys([uploaded.name.rsplit(".", 1)[0], preset["name"]]))
+    file_name = uploaded.name.rsplit(".", 1)[0] or preset["name"]
+    name_default = file_name if preset_id == "custom" else preset["name"]
+    name_options = list(dict.fromkeys([file_name, preset["name"]]))
+    if imported_config.get("dataset_name") and imported_config["dataset_name"] not in name_options:
+        name_options.append(imported_config["dataset_name"])
     dataset_name = select(t("Dataset name"), name_options, key("name"), name_default)
     mapping_left, mapping_right = st.columns(2)
     with mapping_left:
@@ -118,6 +139,9 @@ def main():
                 st.code(f'from google.colab import files\n\nvalidated_predictions[{preset["name"]!r}].to_csv({filename!r}, index=False)\nfiles.download({filename!r})', language="python")
 
     outcome_values = frame[target_column].dropna().unique().tolist() if target_column else []
+    if imported_config and imported_config.get("target_column") == target_column:
+        outcome_values = list(dict.fromkeys([*outcome_values, imported_config["positive_value"],
+                                            *imported_config["negative_values"], *imported_config["excluded_values"]]))
     if target_column and frame[target_column].isna().any():
         st.warning(t("The outcome column contains missing values. Resolve them in the CSV before auditing."))
     if target_column and not outcome_values:
@@ -179,19 +203,46 @@ def main():
     st.caption(t("The focus share controls detailed group results. It is not a recommended capacity."))
     with st.expander(t("Dataset context (optional)")):
         timing = select(t("When were the predictions produced?"),
-                        ["", "At enrollment", "At the end of the first semester", "At the end of an academic year"],
+                        TIMINGS,
                         key("timing_choice"), "", format_func=lambda value: t(value or "Not supplied"))
         horizon = select(t("What outcome period do they cover?"),
-                         ["", "By the end of the first semester", "By the end of the first year", "By the end of an academic year", "By the end of the programme"],
+                         HORIZONS,
                          key("horizon_choice"), "", format_func=lambda value: t(value or "Not supplied"))
         st.caption(t("These descriptions are supplied by you; the app cannot verify prediction timing or outcome definitions."))
         st.caption(t("If no option matches your data, leave Not supplied."))
 
-    signature = result_signature((file_digest, delimiter, encoding, dataset_name, target_column, score_column,
-                                  positive_value, negative_values, excluded_values, decision_unit, entity_id_column,
-                                  use_source_row_number, decision_id_columns, group_columns, references, shares, focus_share, timing, horizon))
+    config = dict(dataset_name=dataset_name, target_column=target_column, score_column=score_column,
+                  positive_value=positive_value, negative_values=negative_values, excluded_values=excluded_values,
+                  decision_unit=decision_unit, entity_id_column=entity_id_column, use_source_row_number=use_source_row_number,
+                  decision_id_columns=decision_id_columns, group_columns=group_columns, group_references=references,
+                  review_shares=shares, focus_share=focus_share, prediction_timing=timing, outcome_horizon=horizon)
+    signature = result_signature((file_digest, delimiter, encoding, config))
     st.header(t("3. Run audit"))
-    if st.button(t("Run audit"), type="primary", key="run_audit", disabled=not shares):
+    ready = bool(target_column and score_column and positive_value is not None and negative_values and shares
+                 and (use_source_row_number or decision_id_columns) and not unmapped)
+    st.subheader(t("Data summary before audit"))
+    if ready:
+        try:
+            preview = preview_uploaded_audit(frame, config)
+        except ValueError as exc:
+            ready = False
+            st.error(error_text(exc, language))
+        else:
+            labels = [("Input records", "input_records"), ("Excluded records", "excluded_records"),
+                      ("Audited records", "audited_records"), ("Positive cases", "positive_records"),
+                      ("Negative cases", "negative_records"), ("Distinct supplied student IDs", "unique_students")]
+            for area, (label, field) in zip(st.columns(3) * 2, labels):
+                area.markdown("**" + t(label) + ":** " + (t("Not supplied") if preview[field] is None else f"{preview[field]:,}"))
+            if group_columns:
+                st.dataframe({t("Group column"): group_columns,
+                              t("Missing group values after exclusions"): [preview["missing_group_records"][c] for c in group_columns]},
+                             hide_index=True, width="stretch")
+            st.caption(t("This summary uses the declared outcome mapping and exclusions. Input checks do not verify real student identity or prediction provenance."))
+            st.download_button(t("Save settings JSON"), write_settings(config, preset_id=preset_id, delimiter=delimiter, encoding=encoding),
+                               "eduai-audit-settings.json", "application/json", key="settings_download", on_click="ignore")
+    else:
+        st.info(t("Complete the outcome, probability, key, and share selections to preview the audit population."))
+    if st.button(t("Run audit"), type="primary", key="run_audit", disabled=not ready):
         st.session_state.pop("audit_result_v2", None)
         if target_column is None or score_column is None or positive_value is None:
             st.error(t("Select the outcome, probability, and positive-outcome fields."))
@@ -204,15 +255,7 @@ def main():
         else:
             try:
                 with st.spinner(t("Calculating audit metrics and uncertainty intervals...")):
-                    comparison, report = build_uploaded_audit(
-                        frame, dataset_name=dataset_name, target_column=target_column,
-                        positive_value=positive_value, negative_values=negative_values,
-                        excluded_values=excluded_values, score_column=score_column, decision_unit=decision_unit,
-                        decision_id_columns=decision_id_columns, entity_id_column=entity_id_column,
-                        group_columns=group_columns, group_references=references, review_shares=shares,
-                        focus_share=focus_share, prediction_timing=timing, outcome_horizon=horizon,
-                        use_source_row_number=use_source_row_number,
-                    )
+                    comparison, report = build_uploaded_audit(frame, **config)
                 st.session_state["audit_result_v2"] = dict(signature=signature, comparison=comparison, report=report)
             except ValueError as exc:
                 st.error(error_text(exc, language))
@@ -242,6 +285,12 @@ def main():
     st.subheader(t("Metrics across review shares"))
     st.altair_chart(capacity_chart(comparison["summary"], "rates", language), width="stretch")
     st.caption(t("Lines connect observed results at the declared shares. They do not select an optimal capacity. Intervals and support notes are in the tables."))
+    if group_columns:
+        st.subheader(t("Group metrics at the focus share"))
+        feature = select(t("Compare groups by"), group_columns, key("chart_feature"), group_columns[0])
+        st.caption(t("Points show group estimates; lines show available confidence intervals. Unavailable intervals are not drawn. Inspect support notes in the tooltips and tables."))
+        for area, metric in zip(st.columns(2), ["recall_pct", "false_positive_rate_pct"]):
+            area.altair_chart(group_chart(comparison["reports"][focus_share], feature, metric, language), width="stretch")
     for title, table_key in [("Review capacities", "capacity_results"), ("Additional workload", "marginal_changes"),
                              ("Group comparisons at the focus share", "group_comparisons")]:
         if not report["tables"][table_key].empty:
@@ -259,6 +308,16 @@ def main():
             st.write("• " + note)
     st.download_button(t("Download full HTML report"), report["html"].encode("utf-8"),
                        file_name=f"eduai-audit-report-{language}.html", mime="text/html", key="report_download")
+    st.subheader(t("Export audit tables"))
+    st.caption(t("CSVs include all compared shares with numeric values and original column and status codes. Empty numeric cells mean unavailable, not zero."))
+    tables = export_tables(comparison, saved["report"])
+    table_name = select(t("Table to download"), list(EXPORT_LABELS), key("export_table"), "capacity_results",
+                        format_func=lambda value: t(EXPORT_LABELS[value]))
+    csv_area, zip_area = st.columns(2)
+    csv_area.download_button(t("Download selected table CSV"), table_csv(tables[table_name]),
+                             table_name + ".csv", "text/csv", key="csv_download", on_click="ignore")
+    zip_area.download_button(t("Download all tables ZIP"), tables_zip(tables, saved["report"]),
+                             "eduai-audit-tables.zip", "application/zip", key="tables_download", on_click="ignore")
 
 
 if __name__ == "__main__":

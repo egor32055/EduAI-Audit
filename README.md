@@ -55,6 +55,23 @@ The file is synthetic demonstration data, not a research result.
   optional student ID identifies repeated records from the same person. A reference
   group is the baseline for **other group minus reference**; choosing it changes
   signed comparisons, not ranking or group metrics.
+- Before running, a population summary shows input, excluded and audited records,
+  positive and negative outcomes, distinct supplied student IDs, and missing group
+  values after exclusions. It uses the notebook's input checks without calculating
+  rankings or intervals.
+- The group view plots Recall and FPR at the focus share with the existing
+  individual confidence intervals. Hover for denominators, interval status and
+  support notes. Undefined metrics are labelled; unavailable intervals are omitted.
+  Offline group plots for every configured feature are included in the HTML report.
+- **Save settings JSON** downloads a versioned mapping, CSV parser options, outcome
+  rules, groups, references, shares, and context. Upload it under **Load saved
+  settings**, then select **Apply settings**. The current CSV is checked before any
+  widget is changed. Missing columns or incompatible data leave the current settings
+  intact. No student rows, predictions, or audit results are saved in this profile.
+- Export one aggregate table as CSV or all six tables in a ZIP. Exports cover every
+  declared share, keep numeric precision and source/status codes, and use UTF-8 with
+  BOM. Numeric missing values stay empty. The ZIP manifest describes the scope;
+  consult the HTML report for assumptions and limitations.
 
 An original dataset CSV usually has outcomes and features but no model predictions.
 If the expected score column is missing, the app explains what to upload and shows

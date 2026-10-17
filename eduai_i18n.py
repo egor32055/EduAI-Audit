@@ -93,6 +93,37 @@ RU = {
 }
 
 
+RU.update({
+    "Load saved settings (optional)": "Загрузить сохранённые настройки (необязательно)",
+    "Settings JSON file": "JSON-файл настроек", "Apply settings": "Применить настройки",
+    "Settings applied. Review the data summary before running the audit.": "Настройки применены. Перед запуском проверьте сводку данных.",
+    "Save settings JSON": "Сохранить настройки JSON", "Data summary before audit": "Сводка данных перед аудитом",
+    "Input records": "Строк на входе", "Excluded records": "Исключено строк", "Positive cases": "Положительные случаи",
+    "Negative cases": "Отрицательные случаи", "Distinct supplied student IDs": "Различных указанных ID студентов",
+    "Group column": "Столбец группы", "Group": "Группа",
+    "Missing group values after exclusions": "Пропуски в группе после исключений",
+    "This summary uses the declared outcome mapping and exclusions. Input checks do not verify real student identity or prediction provenance.": "Сводка учитывает выбранные исходы и исключения. Проверка данных не подтверждает реальную личность студентов и происхождение прогнозов.",
+    "Complete the outcome, probability, key, and share selections to preview the audit population.": "Выберите исходы, вероятность, ключ и доли отбора, чтобы увидеть состав проверяемой выборки.",
+    "Group metrics at the focus share": "Показатели групп при выбранной доле", "Compare groups by": "Сравнить группы по столбцу",
+    "Points show group estimates; lines show available confidence intervals. Unavailable intervals are not drawn. Inspect support notes in the tooltips and tables.": "Точки показывают значения метрик, линии — доступные доверительные интервалы. Недоступные интервалы не изображаются. Замечания о числе наблюдений доступны в подсказках и таблицах.",
+    "Reference group": "Базовая группа", "Other group": "Другая группа", "No support flag": "Без замечания о числе наблюдений",
+    "Metric unavailable": "Метрика недоступна",
+    "Interval lower bound (%)": "Нижняя граница интервала (%)", "Interval upper bound (%)": "Верхняя граница интервала (%)",
+    "Interval status": "Статус интервала", "Relevant outcomes": "Исходов в знаменателе", "Contributing students": "Студентов в знаменателе",
+    "Support note": "Замечание о наблюдениях", "Available": "Доступен", "No Relevant Outcomes": "Нет исходов для расчёта",
+    "Missing Entity ID": "Не указан ID студента", "Too Few Independent Units": "Слишком мало независимых студентов",
+    "Boundary Estimate: Bootstrap Unavailable": "Граничная оценка: бутстрэп недоступен",
+    "Too Few Outcome Event Units": "Слишком мало студентов с выбранными или невыбранными исходами",
+    "Too Many Undefined Resamples": "Слишком много неопределённых повторных выборок", "Degenerate Bootstrap": "Вырожденные повторные выборки бутстрэпа",
+    "Limited Outcome Support": "Мало студентов с соответствующим исходом",
+    "Sparse Selected or Unselected Outcomes": "Мало студентов с выбранными или невыбранными исходами",
+    "Export audit tables": "Скачать таблицы аудита", "Table to download": "Таблица для скачивания",
+    "Group comparisons at all shares": "Сравнение групп при всех долях отбора",
+    "Download selected table CSV": "Скачать выбранную таблицу CSV", "Download all tables ZIP": "Скачать все таблицы ZIP",
+    "CSVs include all compared shares with numeric values and original column and status codes. Empty numeric cells mean unavailable, not zero.": "CSV содержат все сравниваемые доли отбора: числовые значения и исходные названия столбцов и коды статусов. Пустая числовая ячейка означает, что значение недоступно, а не равно нулю.",
+})
+
+
 def tr(text, language="en", **values):
     if language not in ("en", "ru"):
         raise ValueError("Unsupported language")
@@ -116,6 +147,10 @@ def metric_help(label, language="en"):
 
 
 ERRORS_RU = {
+    "The settings file has an invalid structure or unsupported values.": "В файле настроек неверная структура или неподдерживаемые значения.",
+    "This settings file is not a supported EduAI-Audit version.": "Версия файла настроек не поддерживается EduAI-Audit.",
+    "Choose a settings JSON file smaller than 256 KB.": "Выберите JSON-файл настроек размером до 256 КБ.",
+    "The settings file is not valid UTF-8 JSON.": "Файл настроек должен быть корректным JSON в кодировке UTF-8.",
     "The CSV file is empty.": "CSV-файл пуст.",
     "The file cannot be decoded with the selected encoding.": "Файл не читается в выбранной кодировке. Попробуйте другую кодировку.",
     "The CSV file has no readable header.": "Не удалось прочитать строку названий столбцов CSV.",
