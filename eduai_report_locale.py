@@ -7,7 +7,7 @@ import re
 import pandas as pd
 
 from eduai_charts import charts_html
-from eduai_i18n import tr
+from eduai_i18n import metric_help, tr
 from eduai_report import _report_interval, _report_number, _report_percent
 
 
@@ -23,13 +23,13 @@ HEADERS_RU = {
     "Equal-Score Rule": "Правило равных вероятностей", "Prediction Timing": "Момент получения прогнозов", "Outcome Horizon": "Период наблюдения исходов",
     "Decision Key Note": "Примечание о ключе решения", "Review Share": "Доля отбора", "Selected Records": "Выбрано строк",
     "Found Cases": "Найдено случаев", "Missed Cases": "Пропущено случаев", "False Alarms": "Ложные тревоги",
-    "Precision": "Точность отбора", "Recall": "Полнота", "False-Positive Rate": "Доля ложных тревог",
+    "Precision": "Precision", "Recall": "Recall", "False-Positive Rate": "False-Positive Rate (FPR)",
     "Group Feature": "Столбец группы", "Group": "Группа", "Records": "Строки", "Positive Outcomes": "Положительные исходы",
     "Metric": "Показатель", "Estimate": "Оценка", "Relevant Outcomes": "Исходы в знаменателе",
     "Contributing Students": "Студенты в знаменателе", "Interval Status": "Статус интервала", "Support Note": "Замечание о наблюдениях",
     "Comparison": "Сравнение", "Difference (pp)": "Разница (п. п.)", "From Review Share": "С доли отбора", "To Review Share": "До доли отбора",
     "Additional Records": "Дополнительно строк", "Additional Found Cases": "Дополнительно найдено случаев",
-    "Additional False Alarms": "Дополнительные ложные тревоги", "Marginal Precision": "Точность дополнительного отбора",
+    "Additional False Alarms": "Дополнительные ложные тревоги", "Marginal Precision": "Marginal Precision",
 }
 STATUS_RU = {
     "Available": "Доступен", "Unavailable": "Недоступно", "No Relevant Outcomes": "Нет исходов для расчёта",
@@ -52,7 +52,7 @@ LIMITS_RU = {
     "Intervals describe evaluation-sample uncertainty for fixed scores and selections, assuming independent students and allowing dependence within supplied student IDs. They do not cover model refitting, re-ranking, or future-cohort changes.": "Интервалы описывают неопределённость проверочной выборки при фиксированных прогнозах и отборе. Предполагается независимость студентов, а записи одного студента могут быть связаны. Повторное обучение, новое ранжирование и изменения будущих наборов студентов не учитываются.",
     "Intervals are individual exploratory comparisons without simultaneous coverage across groups or review shares. An interval including zero does not establish equality; excluding zero does not establish causation or discrimination.": "Интервалы относятся к отдельным исследовательским сравнениям, без одновременной гарантии для всех групп и долей отбора. Наличие нуля в интервале не доказывает равенство; отсутствие нуля не доказывает причинность или дискриминацию.",
     "Capacity changes are observed count differences. The report does not infer significance of policy changes or select an optimal capacity.": "Изменения при переходе между долями отбора — наблюдаемые разницы чисел. Отчёт не оценивает статистическую значимость изменения политики и не выбирает оптимальную долю.",
-    "Recall divides found positive cases by all positive cases. False-positive rate divides false alarms by negative cases. Precision is the positive-case share of selected records; marginal precision uses only additional selected records.": "Полнота — доля найденных положительных случаев среди всех положительных. Доля ложных тревог — число ложных тревог, делённое на число отрицательных случаев. Точность отбора — доля положительных случаев среди выбранных строк; точность дополнительного отбора использует только добавленные строки.",
+    "Recall divides found positive cases by all positive cases. False-positive rate divides false alarms by negative cases. Precision is the positive-case share of selected records; marginal precision uses only additional selected records.": "Recall — доля найденных положительных случаев среди всех положительных. False-Positive Rate (FPR) — число ложных тревог, делённое на число отрицательных случаев. Precision — доля положительных случаев среди выбранных строк. Marginal Precision использует только дополнительно выбранные строки.",
     "Group labels follow the supplied display mapping; unmapped values remain source codes. Support flags and bootstrap guards are diagnostic rules, not guarantees of interval coverage.": "Названия групп следуют переданным подписям; остальные значения остаются исходными кодами. Замечания о числе наблюдений и ограничения бутстрэпа служат диагностике и не гарантируют покрытие интервалов.",
     "No student ID was supplied. Student identity and duplicate students cannot be verified from technical row keys; student intervals rely on the one-row-per-student assumption.": "ID студента не указан. Технический ключ строки не проверяет личность и повторяющихся студентов; интервалы для студентов опираются на предположение «одна строка — один студент».",
     "Outcome exclusions change the evaluation population. Compare capacities within this filtered cohort; results do not describe the excluded outcomes.": "Исключение исходов меняет оцениваемую выборку. Сравнивайте доли отбора внутри этой выборки; результаты не описывают исключённые исходы.",
@@ -90,6 +90,8 @@ def _russian_tables(report, comparison):
                     table.at[index, "Value"] = _status(value)
                 elif field in {"Student ID Column", "Prediction Timing", "Outcome Horizon"} and value == "Not supplied":
                     table.at[index, "Value"] = "Не указано"
+                elif field in {"Prediction Timing", "Outcome Horizon"}:
+                    table.at[index, "Value"] = tr(value, "ru")
                 elif field in {"Group Features", "Reference Groups", "Negative Outcomes", "Excluded Outcomes"} and value == "None":
                     table.at[index, "Value"] = "Нет"
                 table.at[index, "Field"] = HEADERS_RU.get(field, field)
@@ -136,7 +138,7 @@ def _russian_findings(report, comparison):
             text = f"Увеличение доли отбора с {percent(row.from_review_share_pct)} до {percent(row.to_review_share_pct)} добавляет к проверке записей: {count(row.additional_records)}; дополнительно найдено положительных случаев: {count(row.additional_found_positives)}; добавлено ложных тревог: {count(row.additional_false_alarms)}."
         elif rule == "group_difference":
             row = next(differences)
-            metric = HEADERS_RU[{"recall_pct": "Recall", "false_positive_rate_pct": "False-Positive Rate"}[row.metric]].lower()
+            metric = HEADERS_RU[{"recall_pct": "Recall", "false_positive_rate_pct": "False-Positive Rate"}[row.metric]]
             interval = _formatted(_report_interval(row._asdict(), difference=True))
             difference = "Недоступно" if pd.isna(row.difference_pp) else f"{row.difference_pp:+.1f} п. п."
             if row.ci_status != "Available":
@@ -168,18 +170,32 @@ def _russian_findings(report, comparison):
     return result
 
 
+def _metric_tooltips(html, language):
+    """Offline reports expose the same explanations by hovering over a question mark."""
+    def annotate(match):
+        tag, label = match.groups()
+        explanation = metric_help(label, language)
+        if not explanation:
+            return match.group(0)
+        return f'<{tag}>{label} <abbr tabindex="0" title="{escape(explanation, quote=True)}" style="cursor:help;text-decoration:none" aria-label="{escape(explanation, quote=True)}">?</abbr></{tag}>'
+    return re.sub(r"<(th|td)>([^<]+)</\1>", annotate, html)
+
+
 def present_report(report, comparison, language="en"):
     """Change presentation language and add plots without rerunning the audit."""
     if language not in ("en", "ru"):
         raise ValueError("Unsupported language")
     chart_html = charts_html(comparison["summary"], language)
+    metric_note = next(note for note in report["limitations"] if note.startswith("Recall divides"))
     if language == "en":
         html = report["html"].replace("<html>", '<html lang="en">', 1)
-        return {**report, "html": html.replace("<h3>Review Capacities</h3>", chart_html + "<h3>Review Capacities</h3>", 1)}
+        html = html.replace('<li>' + escape(metric_note) + '</li>', '')
+        return {**report, "limitations": [note for note in report["limitations"] if note != metric_note],
+                "html": _metric_tooltips(html.replace("<h3>Review Capacities</h3>", chart_html + "<h3>Review Capacities</h3>", 1), language)}
     result = deepcopy(report)
     result["tables"] = _russian_tables(report, comparison)
     result["findings"] = _russian_findings(report, comparison)
-    result["limitations"] = [LIMITS_RU[note] for note in report["limitations"]]
+    result["limitations"] = [LIMITS_RU[note] for note in report["limitations"] if note != metric_note]
     def table(key):
         frame = result["tables"][key]
         return '<p>Для этого раздела нет результатов.</p>' if frame.empty else '<div class="audit-table">' + frame.to_html(index=False, border=0, escape=True) + '</div>'
@@ -197,5 +213,5 @@ def present_report(report, comparison, language="en"):
               '<details><summary>Числа по группам</summary>' + table("group_counts") + '</details>',
               '<details><summary>Показатели групп и неопределённость</summary>' + table("group_uncertainty") + '</details>',
               '<h2>Как читать результаты и ограничения</h2><ul>' + ''.join('<li>' + escape(note) + '</li>' for note in result["limitations"]) + '</ul></body></html>']
-    result["html"] = ''.join(pieces)
+    result["html"] = _metric_tooltips(''.join(pieces), language)
     return result

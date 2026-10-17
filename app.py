@@ -5,9 +5,9 @@ from pathlib import Path
 
 import streamlit as st
 
-from eduai_app_service import build_uploaded_audit, load_prediction_csv, parse_review_shares
+from eduai_app_service import build_uploaded_audit, load_prediction_csv
 from eduai_charts import capacity_chart
-from eduai_i18n import error_text, tr
+from eduai_i18n import METRIC_HELP, error_text, metric_help, tr
 from eduai_presets import PRESETS, preset_defaults
 from eduai_report_locale import present_report
 
@@ -22,13 +22,19 @@ def select(label, options, key, default=None, **kwargs):
         st.session_state[key] = default if default in options else options[0]
     if None in options and "format_func" in kwargs:
         kwargs.setdefault("placeholder", kwargs["format_func"](None))
-    return st.selectbox(label, options, key=key, **kwargs)
+    return st.selectbox(label, options, key=key, filter_mode=None, **kwargs)
 
 
 def multi(label, options, key, default=(), language="en", **kwargs):
     values = st.session_state.get(key, list(default))
     st.session_state[key] = [value for value in values if value in options]
-    return st.multiselect(label, options, key=key, placeholder=tr("Choose values", language), **kwargs)
+    return st.multiselect(label, options, key=key, filter_mode=None, placeholder=tr("Choose values", language), **kwargs)
+
+
+def show_table(table, language):
+    columns = {label: st.column_config.TextColumn(label=label + " ?", help=metric_help(label, language))
+               for label in table.columns if metric_help(label, language)}
+    st.dataframe(table, width="stretch", hide_index=True, column_config=columns)
 
 
 def main():
@@ -36,7 +42,7 @@ def main():
     title_area, language_area = st.columns([4, 1])
     with language_area:
         language = st.selectbox("Language / Язык", ["en", "ru"],
-                                format_func=lambda value: {"en": "English", "ru": "Русский"}[value], key="language")
+                                format_func=lambda value: {"en": "English", "ru": "Русский"}[value], key="language", filter_mode=None)
     t = lambda text, **values: tr(text, language, **values)
     with title_area:
         st.title("EduAI Audit")
@@ -49,9 +55,9 @@ def main():
         uploaded = st.file_uploader(t("CSV file"), type="csv", key="upload_file",
                                    help=t("One row per decision; include existing probabilities and observed outcomes."))
     with right:
-        delimiter = st.selectbox(t("Delimiter"), [",", ";", "\t", "|"], key="delimiter",
+        delimiter = st.selectbox(t("Delimiter"), [",", ";", "\t", "|"], key="delimiter", filter_mode=None,
                                 format_func=lambda value: t({",": "Comma", ";": "Semicolon", "\t": "Tab", "|": "Pipe"}[value]))
-        encoding = st.selectbox(t("Encoding"), ["utf-8-sig", "cp1251"], key="encoding",
+        encoding = st.selectbox(t("Encoding"), ["utf-8-sig", "cp1251"], key="encoding", filter_mode=None,
                                format_func=lambda value: {"utf-8-sig": "UTF-8", "cp1251": "Windows-1251"}[value])
     sample_path = Path(__file__).parent / "examples" / "sample_predictions.csv"
     if uploaded is None:
@@ -74,7 +80,7 @@ def main():
         st.dataframe(frame.head(10), width="stretch", hide_index=True)
 
     st.header(t("2. Configure the audit"))
-    preset_id = st.selectbox(t("Configuration preset"), list(PRESETS), key="preset_id",
+    preset_id = st.selectbox(t("Configuration preset"), list(PRESETS), key="preset_id", filter_mode=None,
                             format_func=lambda value: t(PRESETS[value]["name"]))
     st.caption(t("Presets fill matching fields from PROTOTYPE. Review them for your file; every field remains editable."))
     if preset_id in {"upv_2022", "oulad", "uci"}:
@@ -93,7 +99,8 @@ def main():
     if missing:
         st.warning(t("The selected preset could not find these expected columns: {columns}. Select available mappings or upload a prepared prediction export.", columns=", ".join(missing)))
     name_default = uploaded.name.rsplit(".", 1)[0] if preset_id == "custom" else preset["name"]
-    dataset_name = st.text_input(t("Dataset name"), value=name_default, key=key("name"))
+    name_options = list(dict.fromkeys([uploaded.name.rsplit(".", 1)[0], preset["name"]]))
+    dataset_name = select(t("Dataset name"), name_options, key("name"), name_default)
     mapping_left, mapping_right = st.columns(2)
     with mapping_left:
         target_column = select(t("Observed outcome column"), [None, *columns], key("target"), defaults["target_column"],
@@ -161,20 +168,24 @@ def main():
             if reference is not None:
                 references[column] = reference
 
-    shares_text = st.text_input(t("Review shares (%)"), value="15, 20, 30", key=key("shares"),
-                                help=t("Enter percentages separated by commas. Selection counts round upward after exclusions."))
-    try:
-        shares = parse_review_shares(shares_text)
-    except ValueError as exc:
-        st.error(error_text(exc, language))
-        shares = []
+    share_percentages = multi(t("Review shares (%)"), list(range(1, 101)), key("share_choices"),
+                              [15, 20, 30], language=language, format_func=lambda value: f"{value}%",
+                              help=t("Select one or more percentages. Selection counts round upward after exclusions."))
+    shares = [value / 100 for value in sorted(share_percentages)]
+    if not shares:
+        st.info(t("Select at least one review share."))
     focus_share = select(t("Report focus share"), shares, key("focus"), 0.20,
                          format_func=lambda value: f"{100 * value:g}%") if shares else None
     st.caption(t("The focus share controls detailed group results. It is not a recommended capacity."))
     with st.expander(t("Dataset context (optional)")):
-        timing = st.text_input(t("When were the predictions produced?"), key=key("timing"), placeholder=t("For example: at enrollment"))
-        horizon = st.text_input(t("What outcome period do they cover?"), key=key("horizon"), placeholder=t("For example: by the end of the first year"))
+        timing = select(t("When were the predictions produced?"),
+                        ["", "At enrollment", "At the end of the first semester", "At the end of an academic year"],
+                        key("timing_choice"), "", format_func=lambda value: t(value or "Not supplied"))
+        horizon = select(t("What outcome period do they cover?"),
+                         ["", "By the end of the first semester", "By the end of the first year", "By the end of an academic year", "By the end of the programme"],
+                         key("horizon_choice"), "", format_func=lambda value: t(value or "Not supplied"))
         st.caption(t("These descriptions are supplied by you; the app cannot verify prediction timing or outcome definitions."))
+        st.caption(t("If no option matches your data, leave Not supplied."))
 
     signature = result_signature((file_digest, delimiter, encoding, dataset_name, target_column, score_column,
                                   positive_value, negative_values, excluded_values, decision_unit, entity_id_column,
@@ -223,24 +234,26 @@ def main():
     for finding in report["findings"]:
         st.write("• " + finding["text"])
 
+    for area, name in zip(st.columns(4), METRIC_HELP):
+        area.markdown("**" + name + (" (FPR)" if name == "False-Positive Rate" else "") + "**",
+                      help=metric_help(name, language))
     st.subheader(t("Counts across review shares"))
     st.altair_chart(capacity_chart(comparison["summary"], "counts", language), width="stretch")
     st.subheader(t("Metrics across review shares"))
     st.altair_chart(capacity_chart(comparison["summary"], "rates", language), width="stretch")
-    st.caption(t("Recall = found / all positive cases. Precision = found / selected. False-positive rate = false alarms / all negative cases."))
     st.caption(t("Lines connect observed results at the declared shares. They do not select an optimal capacity. Intervals and support notes are in the tables."))
     for title, table_key in [("Review capacities", "capacity_results"), ("Additional workload", "marginal_changes"),
                              ("Group comparisons at the focus share", "group_comparisons")]:
         if not report["tables"][table_key].empty:
             st.subheader(t(title))
-            st.dataframe(report["tables"][table_key], width="stretch", hide_index=True)
+            show_table(report["tables"][table_key], language)
     for title, table_key in [("Data and scope", "scope"), ("Group counts", "group_counts"),
                              ("Group metrics and uncertainty", "group_uncertainty")]:
         with st.expander(t(title)):
             if report["tables"][table_key].empty:
                 st.write(t("No results for this section."))
             else:
-                st.dataframe(report["tables"][table_key], width="stretch", hide_index=True)
+                show_table(report["tables"][table_key], language)
     with st.expander(t("Reading notes and limits")):
         for note in report["limitations"]:
             st.write("• " + note)

@@ -64,6 +64,13 @@ class PresentationTests(unittest.TestCase):
         self.assertEqual(russian["tables"]["group_counts"]["Группа"].tolist(), report["tables"]["group_counts"]["Group"].tolist())
         self.assertIn('lang="ru"', russian["html"])
         self.assertIn("Ложные тревоги", russian["html"])
+        self.assertIn("Recall", russian["tables"]["capacity_results"].columns)
+        self.assertIn("Precision", russian["tables"]["capacity_results"].columns)
+        self.assertIn("False-Positive Rate (FPR)", russian["tables"]["capacity_results"].columns)
+        self.assertIn("Marginal Precision", russian["tables"]["marginal_changes"].columns)
+        self.assertIn('<abbr tabindex="0" title="Найденные положительные случаи', russian["html"])
+        self.assertNotIn("Recall — доля найденных", russian["html"])
+        self.assertTrue(any("Recall" in finding["text"] for finding in russian["findings"]))
         self.assertNotIn("Key Findings", russian["html"])
         self.assertNotIn("Limited Outcome Support", russian["html"])
         self.assertEqual(russian["html"].count("<svg "), 2)
@@ -81,6 +88,7 @@ class PresentationTests(unittest.TestCase):
         self.assertTrue(any("только общие" in row["text"] for row in russian["findings"]))
         english = present_report(report, comparison, "en")
         self.assertEqual(english["findings"], report["findings"])
+        self.assertIn('title="Found positive cases divided by all positive cases.', english["html"])
 
     def test_locale_handles_cluster_support_missing_groups_and_cutoff_ties(self):
         frame = pd.DataFrame({"row": range(8), "student": [1, 1, 2, 2, 3, 3, 4, 4],
@@ -101,6 +109,8 @@ class PresentationTests(unittest.TestCase):
         self.assertEqual(data.loc[data.metric.eq("Найдено случаев"), "value"].tolist(), comparison["summary"].found_positives.tolist())
         rates = capacity_chart_data(comparison["summary"], "rates")
         self.assertTrue(rates.value.between(0, 100).all())
+        self.assertEqual(set(capacity_chart_data(comparison["summary"], "rates", "ru").metric),
+                         {"Recall", "Precision", "False-Positive Rate (FPR)"})
         capacity_chart(comparison["summary"], "rates", "ru").to_dict(validate=True)
         single = charts_html(comparison["summary"].iloc[:1], "ru")
         self.assertNotIn("nan", single)
@@ -128,12 +138,21 @@ class AppFlowTests(unittest.TestCase):
             self.assertEqual(len(app.exception), 0)
             self.assertEqual([m.value for m in app.metric], ["16", "4", "2", "5", "2"])
             self.assertEqual(app.metric[0].label, "Проверено строк")
+            recall_help = next(widget for widget in app.markdown if widget.value == "**Recall**")
+            self.assertIn("Найденные положительные случаи", recall_help.proto.help)
+            self.assertFalse(any("Recall = найденные" in item.value for item in app.caption))
             reference = next(widget for widget in app.selectbox if widget.label.startswith("Базовая группа для"))
             self.assertEqual(reference.proto.placeholder, "Без базовой группы")
             self.assertEqual(app.session_state["audit_result_v2"]["signature"], saved["signature"])
-            name_input = next(text for text in app.text_input if text.label == "Название выборки")
-            name_input.set_value("Changed cohort").run(timeout=30)
+            self.assertEqual(len(app.text_input), 0)
+            self.assertTrue(all(widget.proto.filter_mode == 3 for widget in [*app.selectbox, *app.multiselect]))
+            shares = next(widget for widget in app.multiselect if widget.label == "Доли отбора (%)")
+            shares.set_value([10, 20]).run(timeout=30)
             self.assertEqual(len(app.metric), 0)
+            self.assertEqual(next(widget for widget in app.selectbox if widget.label == "Доля отбора для подробного отчёта").options, ["10%", "20%"])
+            shares.set_value([]).run(timeout=30)
+            self.assertEqual(len(app.exception), 0)
+            self.assertTrue(app.button(key="run_audit").disabled)
 
 
 if __name__ == "__main__":

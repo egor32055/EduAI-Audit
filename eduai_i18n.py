@@ -48,12 +48,22 @@ RU = {
     "Missing group values remain visible as Unknown in the audit.": "Показатели будут рассчитаны отдельно для значений каждого выбранного столбца. Пропуски останутся в группе Unknown.",
     "Reference groups for signed comparisons (optional)": "Базовые группы для расчёта разниц (необязательно)",
     "Reference for {column}": "Базовая группа для {column}",
-    "A reference is the baseline for differences: other group minus reference. It does not change scores, selections, or group metrics. For example, TP recall 40% minus TC recall 50% gives −10 percentage points.": "Разница считается как показатель другой группы минус показатель базовой. База не меняет прогнозы, отбор или показатели групп. Например, полнота TP 40% минус полнота TC 50% = −10 процентных пунктов.",
+    "A reference is the baseline for differences: other group minus reference. It does not change scores, selections, or group metrics. For example, TP recall 40% minus TC recall 50% gives −10 percentage points.": "Разница считается как показатель другой группы минус показатель базовой. База не меняет прогнозы, отбор или показатели групп. Например, Recall TP 40% минус Recall TC 50% = −10 процентных пунктов.",
     "Review shares (%)": "Доли отбора (%)",
+    "Select one or more percentages. Selection counts round upward after exclusions.": "Выберите одну или несколько долей от 1% до 100%. Число выбранных строк округляется вверх после исключения исходов.",
+    "Select at least one review share.": "Выберите хотя бы одну долю отбора.",
     "Enter percentages separated by commas. Selection counts round upward after exclusions.": "Введите проценты через запятую. Например, 15, 20, 30. Число выбранных строк округляется вверх после исключения исходов.",
     "Report focus share": "Доля отбора для подробного отчёта",
     "The focus share controls detailed group results. It is not a recommended capacity.": "Для этой доли будут показаны подробные результаты по группам. Это ваш выбор для просмотра, а не рекомендация приложения.",
     "Dataset context (optional)": "Контекст данных (необязательно)",
+    "At enrollment": "При поступлении",
+    "At the end of the first semester": "В конце первого семестра",
+    "At the end of an academic year": "В конце учебного года",
+    "By the end of the first semester": "К концу первого семестра",
+    "By the end of the first year": "К концу первого учебного года",
+    "By the end of an academic year": "К концу учебного года",
+    "By the end of the programme": "К завершению программы обучения",
+    "If no option matches your data, leave Not supplied.": "Если подходящего варианта нет, оставьте «Не указано».",
     "When were the predictions produced?": "Когда были получены прогнозы?", "For example: at enrollment": "Например: при поступлении",
     "What outcome period do they cover?": "За какой период наблюдались исходы?", "For example: by the end of the first year": "Например: к концу первого учебного года",
     "These descriptions are supplied by you; the app cannot verify prediction timing or outcome definitions.": "Это ваши пояснения: приложение не может проверить время получения прогнозов и смысл исходов.",
@@ -72,8 +82,12 @@ RU = {
     "Download full HTML report": "Скачать полный HTML-отчёт",
     "Counts across review shares": "Числа при разных долях отбора", "Metrics across review shares": "Показатели при разных долях отбора",
     "Requested review share (%)": "Заданная доля отбора (%)", "Records": "Строки", "Rate (%)": "Показатель (%)", "Metric": "Показатель",
-    "Recall": "Полнота", "Precision": "Точность отбора", "False-positive rate": "Доля ложных тревог",
-    "Recall = found / all positive cases. Precision = found / selected. False-positive rate = false alarms / all negative cases.": "Полнота = найденные случаи / все положительные случаи. Точность отбора = найденные случаи / выбранные строки. Доля ложных тревог = ложные тревоги / все отрицательные случаи.",
+    "Recall": "Recall", "Precision": "Precision", "False-positive rate": "False-Positive Rate (FPR)",
+    "Found positive cases divided by all positive cases. Shows how many actual cases were detected.": "Найденные положительные случаи / все положительные случаи. Показывает, какую долю реальных случаев удалось обнаружить.",
+    "Found positive cases divided by selected records. Shows how many selected records are actual positive cases.": "Найденные положительные случаи / выбранные строки. Показывает, какая доля выбранных записей действительно относится к положительному исходу.",
+    "False alarms divided by all negative cases. Shows how many negative cases were selected unnecessarily.": "Ложные тревоги / все отрицательные случаи. Показывает, какая доля записей с отрицательным исходом попала в отбор.",
+    "Additional found positive cases divided by additional selected records when the review share increases. Undefined when no records are added.": "Дополнительно найденные положительные случаи / дополнительно выбранные строки при увеличении доли отбора. Не определена, если новые строки не добавились.",
+    "Recall = found / all positive cases. Precision = found / selected. False-positive rate = false alarms / all negative cases.": "Recall = найденные случаи / все положительные случаи. Precision = найденные случаи / выбранные строки. False-Positive Rate (FPR) = ложные тревоги / все отрицательные случаи.",
     "Lines connect observed results at the declared shares. They do not select an optimal capacity. Intervals and support notes are in the tables.": "Линии соединяют результаты при заданных долях. Графики не выбирают оптимальную долю. Интервалы и замечания о числе наблюдений приведены в таблицах.",
     "Report focus": "Фокус отчёта", "Audit Report": "Отчёт аудита", "Findings": "Результаты",
 }
@@ -83,6 +97,22 @@ def tr(text, language="en", **values):
     if language not in ("en", "ru"):
         raise ValueError("Unsupported language")
     return (RU.get(text, text) if language == "ru" else text).format(**values)
+
+
+METRIC_HELP = {
+    "Recall": "Found positive cases divided by all positive cases. Shows how many actual cases were detected.",
+    "Precision": "Found positive cases divided by selected records. Shows how many selected records are actual positive cases.",
+    "False-Positive Rate": "False alarms divided by all negative cases. Shows how many negative cases were selected unnecessarily.",
+    "Marginal Precision": "Additional found positive cases divided by additional selected records when the review share increases. Undefined when no records are added.",
+}
+
+
+def metric_help(label, language="en"):
+    """Explain displayed metric names, including interval headings, on demand."""
+    for name in ("Marginal Precision", "False-Positive Rate", "Recall", "Precision"):
+        if label.startswith(name):
+            return tr(METRIC_HELP[name], language)
+    return None
 
 
 ERRORS_RU = {

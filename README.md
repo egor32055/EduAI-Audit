@@ -38,11 +38,16 @@ The file is synthetic demonstration data, not a research result.
 - Select **English** or **Русский** at the top. Labels, explanations, findings,
   tables, charts, and the downloadable report use that language. Switching language
   keeps the uploaded file, configured values, and completed audit; calculations
-  are not repeated. Source column names, outcome codes, and supplied context stay
-  unchanged.
+  are not repeated. Metric names stay in English in both languages. Hover over
+  their help icons for definitions in the selected language. Source column names
+  and outcome codes stay unchanged.
 - Presets for **UPV 2022**, **OULAD**, and **UCI** fill the notebook's mappings when
   the corresponding columns and values are present. Defaults remain editable.
   Presets do not aggregate raw records, fit a model, or manufacture probabilities.
+- Settings use selection lists with typing disabled. Choose review shares from
+  1% to 100% in whole percentage points. The dataset name comes from the filename
+  or preset; optional timing and outcome periods use a fixed list with an
+  explicit unspecified option.
 - Charts show existing counts, recall, precision, and false-positive rate across
   the declared review shares. Hover for values. Tables retain individual intervals
   and support notes. The downloaded HTML includes offline SVG charts.
