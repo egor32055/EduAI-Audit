@@ -31,10 +31,15 @@ def _object(pairs):
 
 
 def validate_settings(settings):
-    if not isinstance(settings, dict) or set(settings) != {"application", "version", "csv", "preset_id", "audit"}:
+    if not isinstance(settings, dict):
         _reject()
-    if settings["application"] != "EduAI-Audit" or type(settings["version"]) is not int or settings["version"] != 1:
+    if settings.get("application") != "EduAI-Audit" or type(settings.get("version")) is not int or settings["version"] not in (1, 2):
         raise ValueError("This settings file is not a supported EduAI-Audit version.")
+    fields = {"application", "version", "csv", "preset_id", "audit"}
+    if settings["version"] == 2:
+        fields.add("comparison_score_column")
+    if set(settings) != fields:
+        _reject()
     csv = settings["csv"]
     if not isinstance(csv, dict) or set(csv) != {"delimiter", "encoding"}:
         _reject()
@@ -82,7 +87,11 @@ def validate_settings(settings):
         _reject()
     if config["prediction_timing"] not in TIMINGS or config["outcome_horizon"] not in HORIZONS:
         _reject()
-    return deepcopy(settings)
+    secondary = settings.get("comparison_score_column")
+    if secondary is not None:
+        if not isinstance(secondary, str) or not secondary.strip() or secondary in [config["score_column"], config["target_column"], config["entity_id_column"], *config["decision_id_columns"], *config["group_columns"]]:
+            _reject()
+    return {**deepcopy(settings), "version": 2, "comparison_score_column": secondary}
 
 
 def read_settings(contents):
@@ -96,9 +105,9 @@ def read_settings(contents):
     return validate_settings(data)
 
 
-def write_settings(config, *, preset_id, delimiter, encoding):
-    data = validate_settings(dict(application="EduAI-Audit", version=1, preset_id=preset_id,
-                                  csv=dict(delimiter=delimiter, encoding=encoding), audit=config))
+def write_settings(config, *, preset_id, delimiter, encoding, comparison_score_column=None):
+    data = validate_settings(dict(application="EduAI-Audit", version=2, preset_id=preset_id,
+                                  csv=dict(delimiter=delimiter, encoding=encoding), audit=config, comparison_score_column=comparison_score_column))
     return json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False).encode("utf-8")
 
 
@@ -114,4 +123,6 @@ def widget_settings(settings, digest):
     values = {prefix + key: deepcopy(config[field]) for key, field in fields.items()}
     values.update({prefix + "reference:" + column: config["group_references"].get(column) for column in config["group_columns"]})
     values[prefix + "share_choices"] = sorted(round(100 * share) for share in config["review_shares"])
+    values[prefix + "compare_models"] = settings.get("comparison_score_column") is not None
+    values[prefix + "score_b"] = settings.get("comparison_score_column")
     return {**values, **settings["csv"], "preset_id": settings["preset_id"]}

@@ -124,6 +124,35 @@ RU.update({
 })
 
 
+RU.update({
+    "Compare two prediction columns": "Сравнить две колонки прогнозов",
+    "Both columns must contain ready probabilities for the same positive outcome, prediction time and outcome horizon.": "В обеих колонках нужны готовые вероятности одного положительного исхода, полученные в один момент и для одного периода наблюдения исходов.",
+    "Model A probability column": "Модель A: столбец вероятности", "Model B probability column": "Модель B: столбец вероятности",
+    "Download two-model sample CSV": "Скачать пример CSV с двумя прогнозами",
+    "Choose a second probability column to compare the models.": "Выберите вторую колонку вероятностей для сравнения моделей.",
+    "4. Prediction comparison": "4. Сравнение прогнозов", "Prediction comparison": "Сравнение прогнозов",
+    "Model A: {column_a}. Model B: {column_b}.": "Модель A: {column_a}. Модель B: {column_b}.",
+    "At {share}%, each model selects {selected} of {records} audited decision records.": "При доле {share}% каждая модель отбирает {selected} из {records} проверяемых записей.",
+    "Model": "Модель", "Model A": "Модель A", "Model B": "Модель B", "Score column": "Столбец вероятности",
+    "Results for both models": "Результаты обеих моделей", "Observed differences: B minus A": "Наблюдаемые разницы: B минус A",
+    "Selection overlap": "Пересечение отбора", "Group results for both models": "Результаты обеих моделей по группам",
+    "All decision records": "Все проверяемые записи", "Selected by both models": "Выбраны обеими моделями",
+    "Selected only by A": "Выбраны только A", "Selected only by B": "Выбраны только B", "Selected by neither model": "Не выбраны ни одной моделью",
+    "B minus A describes observed differences on the same cohort. Individual model intervals do not test these differences; paired comparison intervals are not calculated.": "B минус A — наблюдаемая разница на одной выборке. Отдельные интервалы моделей не проверяют значимость этой разницы; парные интервалы для сравнения не рассчитываются.",
+    "The models share outcomes, exclusions, decision keys, groups, prediction timing and outcome horizon. Equal scores use the original input row order.": "Для обеих моделей заданы общие исходы, исключения, ключи решений, группы, момент прогноза и период исходов. Равные вероятности разрешаются по исходному порядку строк.",
+    "Results at all review shares": "Результаты при всех долях отбора",
+    "Overlap counts decision records, not distinct students; one student may have several records.": "Пересечение посчитано по записям решений. У одного студента может быть несколько записей.",
+    "Which decision records were selected?": "Какие записи были выбраны?", "Selection category": "Категория отбора",
+    "Source record numbers refer to data rows before exclusions. Key columns identify the submitted decisions; technical row keys do not verify real student identity.": "Номера записей относятся к строкам данных до исключений. Столбцы ключа обозначают проверяемые решения; технический номер строки не подтверждает реальную личность студента.",
+    "Download these decision records CSV": "Скачать эти записи CSV", "Download comparison HTML report": "Скачать HTML-отчёт сравнения",
+    "Comparison table to download": "Таблица сравнения для скачивания", "Download comparison table CSV": "Скачать таблицу сравнения CSV",
+    "Download comparison tables ZIP": "Скачать таблицы сравнения ZIP", "Detailed model audit (optional)": "Подробный аудит модели (необязательно)",
+    "Not shown": "Не показывать", "Full audit for model A": "Полный аудит модели A", "Full audit for model B": "Полный аудит модели B",
+    "Source record": "Номер исходной записи", "Observed outcome": "Известный исход", "Probability A": "Вероятность A", "Probability B": "Вероятность B",
+    "Selected A": "Выбрана A", "Selected B": "Выбрана B", "Key": "Ключ",
+})
+
+
 def tr(text, language="en", **values):
     if language not in ("en", "ru"):
         raise ValueError("Unsupported language")
@@ -147,6 +176,9 @@ def metric_help(label, language="en"):
 
 
 ERRORS_RU = {
+    "Select a second probability column.": "Выберите вторую колонку вероятностей.",
+    "Choose two different probability columns.": "Выберите две разные колонки вероятностей.",
+    "The second probability column must be separate from outcomes, IDs, and groups.": "Вторая колонка вероятностей должна отличаться от исхода, ID и столбцов групп.",
     "The settings file has an invalid structure or unsupported values.": "В файле настроек неверная структура или неподдерживаемые значения.",
     "This settings file is not a supported EduAI-Audit version.": "Версия файла настроек не поддерживается EduAI-Audit.",
     "Choose a settings JSON file smaller than 256 KB.": "Выберите JSON-файл настроек размером до 256 КБ.",

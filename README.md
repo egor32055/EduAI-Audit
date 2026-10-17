@@ -113,6 +113,32 @@ Run the focused tests with:
 .\.venv\Scripts\python.exe -m unittest discover -v
 ```
 
+### Compare two prediction columns
+
+Upload one CSV containing outcomes, decision keys and two existing probability
+columns. Both columns must refer to the same positive event, prediction time and
+outcome horizon. Enable **Compare two prediction columns**, then select Model A
+and Model B columns. A single mapping, outcome exclusion rule and review share
+apply to both models. Every submitted score is validated, including excluded rows.
+
+The comparison shows each model's counts, Recall, Precision and FPR, observed
+differences **B minus A**, overlap (**both / only A / only B / neither**) and group
+results. Overlap counts decision records; multiple course records may belong to
+one student. Equal scores keep the original CSV order. The record inspector
+shows supplied keys, source data-row numbers, scores and outcomes at the focus
+share. Its separate CSV download includes those decision records; the comparison
+ZIP contains aggregate tables and both individual audits' tables.
+
+Individual model intervals retain the notebook's assumptions. Model differences
+are descriptive counts and percentage-point differences, with no paired intervals
+or significance test and no automatic model recommendation. The HTML report
+includes aggregate comparisons and both full individual audit reports. Settings
+JSON version 2 stores the second column; version 1 single-model profiles still load.
+
+For a synthetic demonstration, download **two-model sample CSV**, upload it, select
+**Synthetic example**, enable comparison, and choose `dropout_probability_b` for B.
+These are illustrative probabilities, not a newly trained model or research result.
+
 ## Notebooks
 
 | Notebook | Purpose |

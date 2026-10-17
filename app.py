@@ -7,9 +7,11 @@ import streamlit as st
 
 from eduai_app_service import build_uploaded_audit, load_prediction_csv, preview_uploaded_audit
 from eduai_charts import capacity_chart, group_chart
+from eduai_comparison_view import render_model_comparison
 from eduai_exports import EXPORT_LABELS, export_tables, table_csv, tables_zip
 from eduai_i18n import METRIC_HELP, error_text, metric_help, tr
 from eduai_presets import PRESETS, preset_defaults
+from eduai_model_comparison import compare_uploaded_predictions, preview_model_comparison
 from eduai_report_locale import present_report
 from eduai_settings import HORIZONS, TIMINGS, read_settings, widget_settings, write_settings
 
@@ -62,7 +64,10 @@ def main():
                 try:
                     settings = read_settings(settings_file.getvalue())
                     candidate = load_prediction_csv(uploaded.getvalue(), **settings["csv"])
-                    preview_uploaded_audit(candidate, settings["audit"])
+                    if settings["comparison_score_column"] is None:
+                        preview_uploaded_audit(candidate, settings["audit"])
+                    else:
+                        preview_model_comparison(candidate, settings["audit"], settings["comparison_score_column"])
                 except ValueError as exc:
                     st.error(error_text(exc, language))
                 else:
@@ -79,6 +84,8 @@ def main():
     if uploaded is None:
         st.info(t("Upload a CSV file to configure an audit."))
         st.download_button(t("Download sample CSV"), sample_path.read_bytes(), "sample_predictions.csv", "text/csv", key="sample_download")
+        st.download_button(t("Download two-model sample CSV"), sample_path.with_name("sample_two_predictions.csv").read_bytes(),
+                           "sample_two_predictions.csv", "text/csv", key="two_model_sample")
         st.caption(t("The sample contains synthetic data. Select the Synthetic example preset after uploading it."))
         return
 
@@ -122,14 +129,23 @@ def main():
     if imported_config.get("dataset_name") and imported_config["dataset_name"] not in name_options:
         name_options.append(imported_config["dataset_name"])
     dataset_name = select(t("Dataset name"), name_options, key("name"), name_default)
+    compare_models = st.checkbox(t("Compare two prediction columns"), key=key("compare_models"),
+                                 help=t("Both columns must contain ready probabilities for the same positive outcome, prediction time and outcome horizon."))
     mapping_left, mapping_right = st.columns(2)
     with mapping_left:
         target_column = select(t("Observed outcome column"), [None, *columns], key("target"), defaults["target_column"],
                                format_func=lambda value: value if value is not None else t("Select a column"))
     with mapping_right:
-        score_column = select(t("Positive-outcome probability column"), [None, *columns], key("score"), defaults["score_column"],
+        score_column = select(t("Model A probability column" if compare_models else "Positive-outcome probability column"), [None, *columns], key("score"), defaults["score_column"],
                               format_func=lambda value: value if value is not None else t("Select a column"),
                               help=t("Scores must be existing probabilities from 0 to 1 for the positive outcome."))
+    score_column_b = None
+    if compare_models:
+        score_column_b = select(t("Model B probability column"), [None, *[c for c in columns if c not in (target_column, score_column)]],
+                                key("score_b"), None, format_func=lambda value: value if value is not None else t("Select a column"),
+                                help=t("Both columns must contain ready probabilities for the same positive outcome, prediction time and outcome horizon."))
+        if score_column_b is None:
+            st.info(t("Choose a second probability column to compare the models."))
     if score_column is None:
         st.warning(t("No recognized prediction column was found. Choose an existing probability column if it has another name. Raw dataset features are not prediction probabilities."))
         if preset_id in {"upv_2022", "oulad", "uci"}:
@@ -164,7 +180,7 @@ def main():
         decision_unit = select(t("Decision unit"), ["student", "course_enrollment", "student_period", "record"], key("unit"), defaults["decision_unit"],
                                format_func=lambda value: t(value.replace("_", " ").title()),
                                help=t("What does one CSV row represent? For prepared UPV 2022 this is a student; for OULAD it is a course enrollment."))
-    id_options = [c for c in columns if c not in (target_column, score_column)]
+    id_options = [c for c in columns if c not in (target_column, score_column, score_column_b)]
     with unit_right:
         entity_id_column = select(t("Student ID column (optional)"), [None, *id_options], key("entity"), defaults["entity_id_column"],
                                   format_func=lambda value: t("Not supplied") if value is None else value,
@@ -216,14 +232,14 @@ def main():
                   decision_unit=decision_unit, entity_id_column=entity_id_column, use_source_row_number=use_source_row_number,
                   decision_id_columns=decision_id_columns, group_columns=group_columns, group_references=references,
                   review_shares=shares, focus_share=focus_share, prediction_timing=timing, outcome_horizon=horizon)
-    signature = result_signature((file_digest, delimiter, encoding, config))
+    signature = result_signature((file_digest, delimiter, encoding, config, compare_models, score_column_b))
     st.header(t("3. Run audit"))
     ready = bool(target_column and score_column and positive_value is not None and negative_values and shares
-                 and (use_source_row_number or decision_id_columns) and not unmapped)
+                 and (use_source_row_number or decision_id_columns) and not unmapped and (not compare_models or score_column_b))
     st.subheader(t("Data summary before audit"))
     if ready:
         try:
-            preview = preview_uploaded_audit(frame, config)
+            preview = preview_model_comparison(frame, config, score_column_b) if compare_models else preview_uploaded_audit(frame, config)
         except ValueError as exc:
             ready = False
             st.error(error_text(exc, language))
@@ -238,7 +254,7 @@ def main():
                               t("Missing group values after exclusions"): [preview["missing_group_records"][c] for c in group_columns]},
                              hide_index=True, width="stretch")
             st.caption(t("This summary uses the declared outcome mapping and exclusions. Input checks do not verify real student identity or prediction provenance."))
-            st.download_button(t("Save settings JSON"), write_settings(config, preset_id=preset_id, delimiter=delimiter, encoding=encoding),
+            st.download_button(t("Save settings JSON"), write_settings(config, preset_id=preset_id, delimiter=delimiter, encoding=encoding, comparison_score_column=score_column_b),
                                "eduai-audit-settings.json", "application/json", key="settings_download", on_click="ignore")
     else:
         st.info(t("Complete the outcome, probability, key, and share selections to preview the audit population."))
@@ -255,18 +271,32 @@ def main():
         else:
             try:
                 with st.spinner(t("Calculating audit metrics and uncertainty intervals...")):
-                    comparison, report = build_uploaded_audit(frame, **config)
-                st.session_state["audit_result_v2"] = dict(signature=signature, comparison=comparison, report=report)
+                    if compare_models:
+                        model_result = compare_uploaded_predictions(frame, config, score_column_b)
+                        st.session_state["audit_result_v2"] = dict(signature=signature, model_comparison=model_result)
+                    else:
+                        comparison, report = build_uploaded_audit(frame, **config)
+                        st.session_state["audit_result_v2"] = dict(signature=signature, comparison=comparison, report=report)
             except ValueError as exc:
                 st.error(error_text(exc, language))
 
     saved = st.session_state.get("audit_result_v2")
     if not saved or saved["signature"] != signature:
         return
+    detailed_model = None
+    if "model_comparison" in saved:
+        model_result = saved["model_comparison"]
+        render_model_comparison(model_result, language, select, show_table, key)
+        model = select(t("Detailed model audit (optional)"), [None, "A", "B"], key("detailed_model"), None,
+                       format_func=lambda value: t("Not shown") if value is None else t("Model " + value))
+        if model is None:
+            return
+        detailed_model = model
+        saved = {"comparison": model_result["comparisons"][model], "report": model_result["reports"][model]}
     comparison = saved["comparison"]
     report = present_report(saved["report"], comparison, language)
     review = comparison["reports"][focus_share]["review"]
-    st.header(t("4. Results and report"))
+    st.header(t("Full audit for model " + detailed_model) if detailed_model else t("4. Results and report"))
     st.success(t("Audit complete. Results describe the submitted, outcome-filtered records."))
     areas = st.columns(5)
     for area, label, field in zip(areas,
