@@ -32,6 +32,10 @@ A desktop shortcut can point to `.venv\Scripts\pythonw.exe` with the full path t
 This shortcut uses the current local installation; it is not a standalone executable.
 To start with terminal output, use the Streamlit command above.
 
+For the self-contained Windows installer and portable build, see
+[packaging/README.md](packaging/README.md). Installed builds open the browser
+interface on port 8502 and include Python and the runtime dependencies.
+
 For a first try, click **Try example**, then **Run audit**. The app loads artificial
 data and complete settings without a file upload, with review shares 15%, 20%,
 and 30% and a 20% report focus. **Try comparison example** loads two predictions.
