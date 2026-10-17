@@ -21,10 +21,16 @@ existing positive-outcome probabilities and observed outcomes, map outcomes and
 decision keys, choose groups and review shares, run the audit, then download a
 standalone HTML report. The app runs locally and does not call an AI service.
 
-After installing the dependencies, you can also double-click `start_app.bat` on
-Windows. Keep its terminal window open while using the app; closing it stops the
-local server. The address `http://127.0.0.1:8501` is available only while the server
-is running. To start it from the PyCharm terminal, use the last command above.
+After installing the dependencies, double-click `start_app.bat` on Windows. It
+starts a background server, waits for it to be ready, and opens the browser. If
+the server is already running, it opens the existing app. Startup errors are
+saved to `.venv/eduai-app.log`. Closing the browser does not stop the background
+server; it ends when Windows shuts down.
+
+A desktop shortcut can point to `.venv\Scripts\pythonw.exe` with the full path to
+`launch_app.py` as its quoted argument and this repository as its working directory.
+This shortcut uses the current local installation; it is not a standalone executable.
+To start with terminal output, use the Streamlit command above.
 
 For a first try, upload [examples/sample_predictions.csv](examples/sample_predictions.csv).
 Select the **Synthetic example** preset. It fills `outcome` as the outcome column,

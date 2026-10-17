@@ -9,7 +9,6 @@ if not exist ".venv\Scripts\python.exe" (
     exit /b 1
 )
 
-echo Starting EduAI Audit at http://127.0.0.1:8501
-echo Keep this window open while using the app. Press Ctrl+C to stop it.
-".venv\Scripts\python.exe" -m streamlit run app.py --server.port=8501
+echo Opening EduAI Audit at http://127.0.0.1:8501
+".venv\Scripts\python.exe" launch_app.py
 if errorlevel 1 pause
