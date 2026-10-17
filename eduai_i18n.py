@@ -1,5 +1,25 @@
 """Human-written UI translations. Dataset names and source codes stay intact."""
 
+COMPARISON_REQUIREMENTS = (
+    "**Comparison conditions**\n\n"
+    "- One CSV contains the same decision records and both ready probability columns. Each decision key must be unique.\n"
+    "- Both columns predict the same positive outcome, at the same prediction time and for the same outcome period.\n"
+    "- Every row has a known outcome; each value is assigned to positive, negative or excluded.\n"
+    "- Both probabilities are finite numbers from 0 to 1, including on excluded rows.\n"
+    "- Both models use the same outcome exclusions, groups and review shares.\n\n"
+    "The app checks the file structure and values. Prediction timing and model training history are supplied by you."
+)
+
+COMPARISON_HOW_IT_WORKS = (
+    "**How comparison works**\n\n"
+    "1. Apply the common outcome exclusions.\n"
+    "2. Rank the remaining records separately by A and B probability, highest first.\n"
+    "3. Select the same share for each model. Counts round up; tied scores keep the original CSV row order.\n"
+    "4. Compare found and missed cases, false alarms, Recall, Precision and FPR. Inspect both / only A / only B / neither and group results.\n\n"
+    "**Example:** with 4 students and a 50% share, each model selects 2. If A selects 001 and 002, and B selects 001 and 003, only 001 is selected by both.\n\n"
+    "B − A is the observed difference. Each model's intervals are separate; they do not test the difference between models."
+)
+
 RU = {
     "Custom CSV": "Свой CSV", "Synthetic example": "Синтетический пример",
     "Audit existing probability predictions against observed outcomes. Compare review capacities, inspect group results, and download a report.": "Сравните готовые прогнозы вероятности с известными исходами: настройте доли отбора, изучите результаты по группам и скачайте отчёт.",
@@ -150,6 +170,29 @@ RU.update({
     "Not shown": "Не показывать", "Full audit for model A": "Полный аудит модели A", "Full audit for model B": "Полный аудит модели B",
     "Source record": "Номер исходной записи", "Observed outcome": "Известный исход", "Probability A": "Вероятность A", "Probability B": "Вероятность B",
     "Selected A": "Выбрана A", "Selected B": "Выбрана B", "Key": "Ключ",
+})
+
+
+RU.update({
+    "How comparison works": "Как работает сравнение",
+    COMPARISON_REQUIREMENTS: (
+        "**Условия сравнения**\n\n"
+        "- Один CSV содержит одни и те же проверяемые записи и две колонки готовых вероятностей. Ключ каждой записи должен быть уникальным.\n"
+        "- Обе колонки прогнозируют один положительный исход, в один момент и за один период наблюдения.\n"
+        "- В каждой строке известен фактический исход. Все значения распределены на положительные, отрицательные или исключаемые.\n"
+        "- Обе вероятности — конечные числа от 0 до 1, в том числе в исключаемых строках.\n"
+        "- Для обеих моделей действуют общие исключения исходов, группы и доли отбора.\n\n"
+        "Приложение проверяет структуру и значения файла. Сведения о времени прогноза и обучении моделей указываете вы."
+    ),
+    COMPARISON_HOW_IT_WORKS: (
+        "**Как работает сравнение**\n\n"
+        "1. Применяются общие исключения исходов.\n"
+        "2. Остальные записи отдельно сортируются по вероятностям A и B: от высокой к низкой.\n"
+        "3. Каждая модель выбирает одинаковую долю. Число записей округляется вверх; при равных вероятностях сохраняется исходный порядок CSV.\n"
+        "4. Сравниваются найденные и пропущенные случаи, ложные тревоги, Recall, Precision и FPR. Отбор разбит на «обе модели», «только A», «только B» и «ни одна»; отдельно показаны группы.\n\n"
+        "**Пример:** 4 студента, доля 50% — каждая модель выберет 2. Если A выбрала 001 и 002, а B — 001 и 003, только 001 выбран обеими.\n\n"
+        "B − A — наблюдаемая разница. Интервалы рассчитаны отдельно для каждой модели и не проверяют значимость разницы между моделями."
+    ),
 })
 
 

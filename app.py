@@ -9,7 +9,7 @@ from eduai_app_service import build_uploaded_audit, load_prediction_csv, preview
 from eduai_charts import capacity_chart, group_chart
 from eduai_comparison_view import render_model_comparison
 from eduai_exports import EXPORT_LABELS, export_tables, table_csv, tables_zip
-from eduai_i18n import METRIC_HELP, error_text, metric_help, tr
+from eduai_i18n import COMPARISON_HOW_IT_WORKS, COMPARISON_REQUIREMENTS, METRIC_HELP, error_text, metric_help, tr
 from eduai_presets import PRESETS, preset_defaults
 from eduai_model_comparison import compare_uploaded_predictions, preview_model_comparison
 from eduai_report_locale import present_report
@@ -130,7 +130,9 @@ def main():
         name_options.append(imported_config["dataset_name"])
     dataset_name = select(t("Dataset name"), name_options, key("name"), name_default)
     compare_models = st.checkbox(t("Compare two prediction columns"), key=key("compare_models"),
-                                 help=t("Both columns must contain ready probabilities for the same positive outcome, prediction time and outcome horizon."))
+                                 help=t(COMPARISON_REQUIREMENTS))
+    if compare_models:
+        st.markdown(t("How comparison works"), help=t(COMPARISON_HOW_IT_WORKS))
     mapping_left, mapping_right = st.columns(2)
     with mapping_left:
         target_column = select(t("Observed outcome column"), [None, *columns], key("target"), defaults["target_column"],
