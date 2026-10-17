@@ -1,0 +1,112 @@
+name: Windows preview release
+
+on:
+  push:
+    branches: [main]
+    paths: [packaging/release-request.json]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-preview-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14.5'
+          cache: pip
+          cache-dependency-path: |
+            packaging/requirements-release.txt
+            packaging/requirements-build.txt
+      - name: Read release version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content packaging/release-request.json -Raw | ConvertFrom-Json).version
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid version.' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+      - name: Install build dependencies
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          .\.venv\Scripts\python.exe -m pip install -r packaging/requirements-release.txt -r packaging/requirements-build.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
+      - name: Test audit and application
+        shell: pwsh
+        run: .\.venv\Scripts\python.exe -m unittest discover -v
+      - name: Build installer
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: .\packaging\build_windows.ps1 -Version $env:RELEASE_VERSION
+      - name: Start bundled runtime without Python on PATH
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path -LiteralPath 'dist\EduAI Audit\EduAI Audit.exe').Path
+          $savedPath = $env:PATH
+          try {
+            $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+            $launcher = Start-Process -FilePath $exe -ArgumentList @('--no-browser','--port','8512') -WorkingDirectory $env:RUNNER_TEMP -WindowStyle Hidden -PassThru
+            if (-not $launcher.WaitForExit(100000) -or $launcher.ExitCode -ne 0) { throw 'Bundled startup failed.' }
+          } finally { $env:PATH = $savedPath }
+          if ((Invoke-WebRequest 'http://127.0.0.1:8512/_stcore/health').Content.Trim() -ne 'ok') { throw 'Health check failed.' }
+      - name: Check examples and reports in browser
+        shell: pwsh
+        run: |
+          npm install --no-save --prefix "$env:RUNNER_TEMP\eduai-ui" playwright@1.62.1
+          if ($LASTEXITCODE -ne 0) { throw 'Browser test dependency installation failed.' }
+          $env:EDUAI_PLAYWRIGHT = "$env:RUNNER_TEMP\eduai-ui\node_modules\playwright"
+          node packaging/check_release.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Bundled browser checks failed.' }
+      - name: Stop bundled runtime
+        if: always()
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD 'dist\EduAI Audit\EduAI Audit.exe'
+          if (Test-Path -LiteralPath $exe) {
+            $stop = Start-Process -FilePath $exe -ArgumentList @('--stop','--port','8512') -WindowStyle Hidden -PassThru
+            if (-not $stop.WaitForExit(15000) -or $stop.ExitCode -ne 0) { throw 'Bundled shutdown failed.' }
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          compression-level: 0
+          if-no-files-found: error
+          path: |
+            dist/EduAI-Audit-Setup-*.exe
+            dist/EduAI-Audit-Setup-*.exe.sha256
+            dist/EduAI Audit/build-info.json
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: release-assets
+      - name: Publish preview installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' files < <(find release-assets -type f -print0)
+          gh release create "v$RELEASE_VERSION" "${files[@]}" --target "$GITHUB_SHA" --title "EduAI Audit $RELEASE_VERSION — Windows preview" --notes-file "packaging/release-notes-$RELEASE_VERSION.md" --prerelease --draft
+          gh release edit "v$RELEASE_VERSION" --draft=false --prerelease

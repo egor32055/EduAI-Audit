@@ -46,3 +46,13 @@ copied there by the launcher; reports are downloaded through the browser.
 This first distribution is an unsigned preview for Windows 10/11 x64. It is not
 code-signed or automatically updated. A successful local smoke check does not
 replace testing on a separate Windows computer without a Python installation.
+
+## Publish a preview on GitHub
+
+Updating `packaging/release-request.json` on `main` starts the Windows release
+workflow. It installs the pinned runtime and build dependencies, runs the tests,
+builds the installer, and checks the bundled examples and downloads in Chrome.
+Only after these checks pass does a separate job publish the installer, checksum,
+and build information as a GitHub prerelease. The publish job alone has repository
+contents write permission. Add matching release notes before requesting a new
+version. Existing release assets are not overwritten automatically.
